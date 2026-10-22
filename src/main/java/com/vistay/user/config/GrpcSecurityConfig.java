@@ -7,9 +7,19 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.grpc.server.GlobalServerInterceptor;
 import org.springframework.grpc.server.security.AuthenticationProcessInterceptor;
 import org.springframework.grpc.server.security.GrpcSecurity;
+import org.springframework.security.core.userdetails.User;
+import org.springframework.security.core.userdetails.UserDetailsService;
 
 @Configuration
 public class GrpcSecurityConfig {
+
+    @Bean
+    UserDetailsService grpcClientDetails() {
+        return certificatePrincipal -> User.withUsername(certificatePrincipal)
+            .password("")
+            .authorities("ROLE_INTERNAL_SERVICE")
+            .build();
+    }
 
     @Bean
     @GlobalServerInterceptor
