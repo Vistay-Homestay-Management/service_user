@@ -9,9 +9,10 @@ import com.vistay.contracts.user.v1.UserAuthorizationServiceGrpc;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
 import org.springframework.grpc.server.service.GrpcService;
+import com.vistay.user.config.GrpcTrustBoundaryInterceptor;
 import org.springframework.jdbc.core.simple.JdbcClient;
 
-@GrpcService
+@GrpcService(interceptors = GrpcTrustBoundaryInterceptor.class)
 public class UserAuthorizationGrpcService extends UserAuthorizationServiceGrpc.UserAuthorizationServiceImplBase {
     private final JdbcClient jdbc;
 
