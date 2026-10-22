@@ -1,5 +1,6 @@
 type Query {
   userServiceInfo: UserServiceInfo!
+  viewer: BackofficeViewer!
 }
 
 type UserServiceInfo {
@@ -7,3 +8,12 @@ type UserServiceInfo {
   version: String!
 }
 
+type BackofficeViewer {
+  accountId: ID!
+  profileId: ID!
+  displayName: String!
+  email: String!
+  roles: [String!]!
+  permissions: [String!]!
+  authorizationVersion: Int!
+}
