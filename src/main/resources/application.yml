@@ -40,17 +40,40 @@ spring:
       ssl.truststore.password: ${KAFKA_TRUSTSTORE_PASSWORD:}
     producer:
       acks: all
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
       properties:
         enable.idempotence: true
     consumer:
+      group-id: ${KAFKA_CONSUMER_GROUP:vistay-user}
       enable-auto-commit: false
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      auto-offset-reset: earliest
       properties:
         isolation.level: read_committed
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${KEYCLOAK_BACKOFFICE_ISSUER:http://localhost:8180/realms/vistay-backoffice}
+          jwk-set-uri: ${KEYCLOAK_BACKOFFICE_JWKS_URI:http://localhost:8180/realms/vistay-backoffice/protocol/openid-connect/certs}
   grpc:
     server:
       port: ${GRPC_SERVER_PORT:9090}
       ssl:
-        enabled: ${GRPC_TLS_ENABLED:false}
+        enabled: ${GRPC_TLS_ENABLED:true}
+        bundle: ${GRPC_SSL_BUNDLE:grpc-server}
+        client-auth: require
+  ssl:
+    bundle:
+      pem:
+        grpc-server:
+          keystore:
+            certificate: ${GRPC_SERVER_CERT:file:/run/secrets/grpc/server.crt}
+            private-key: ${GRPC_SERVER_KEY:file:/run/secrets/grpc/server.key}
+          truststore:
+            certificate: ${GRPC_CLIENT_CA_CERT:file:/run/secrets/grpc/ca.crt}
 
 server:
   port: ${SERVER_PORT:8080}
@@ -71,3 +94,15 @@ logging:
   structured:
     format:
       console: logstash
+
+vistay:
+  security:
+    audience: ${KEYCLOAK_BACKOFFICE_AUDIENCE:vistay-backoffice-api}
+  topics:
+    account-provisioned: ${ACCOUNT_PROVISIONED_TOPIC:vistay.auth.account-provisioned.v1}
+  outbox:
+    poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
+    send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT_SECONDS:10}
+  grpc:
+    allowed-caller-uris: ${GRPC_ALLOWED_CALLER_URIS:spiffe://vistay/service/authentication}
+    maximum-deadline: ${GRPC_MAXIMUM_DEADLINE:2s}
