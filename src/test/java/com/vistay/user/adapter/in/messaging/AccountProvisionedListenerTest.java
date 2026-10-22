@@ -2,10 +2,8 @@ package com.vistay.user.adapter.in.messaging;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.ArgumentMatchers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.jdbc.core.simple.JdbcClient;
@@ -14,7 +12,6 @@ import tools.jackson.databind.json.JsonMapper;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -47,8 +44,10 @@ class AccountProvisionedListenerTest {
         when(jdbc.sql(org.mockito.ArgumentMatchers.startsWith("INSERT INTO admin_users")))
             .thenReturn(profile);
         when(profile.param(anyString(), any())).thenReturn(profile);
-        when(profile.query(UUID.class)).thenReturn(profileQuery);
-        when(profileQuery.single()).thenReturn(profileId);
+        when(profile.query(AccountProvisionedListener.ProfileProvisionedRow.class)).thenReturn(profileQuery);
+        when(profileQuery.single()).thenReturn(
+            new AccountProvisionedListener.ProfileProvisionedRow(profileId, 1)
+        );
 
         when(jdbc.sql(org.mockito.ArgumentMatchers.startsWith("INSERT INTO admin_user_roles")))
             .thenReturn(role);
@@ -66,25 +65,26 @@ class AccountProvisionedListenerTest {
               "type":"vistay.auth.account-provisioned",
               "version":1,
               "aggregateId":"%s",
-              "aggregateVersion":0,
-              "correlationId":"corr-1",
+              "aggregateVersion":1,
+              "correlationId":"%s",
               "causationId":null,
               "occurredAt":"%s",
               "data":{
-                "identityAccountId":"%s",
-                "subject":"%s",
+                "accountId":"%s",
+                "realm":"BACKOFFICE",
                 "email":"admin@vistay.vn",
-                "fullName":"ViStay Admin",
-                "accountType":"ADMIN"
+                "displayName":"ViStay Admin",
+                "provisionedAt":"%s"
               }
             }
-            """.formatted(eventId, accountId, OffsetDateTime.now(), accountId, accountId);
+            """.formatted(eventId, accountId, UUID.randomUUID(), OffsetDateTime.now(), accountId,
+                OffsetDateTime.now());
 
         var listener = new AccountProvisionedListener(jdbc, json);
         listener.onAccountProvisioned(envelope);
         listener.onAccountProvisioned(envelope);
 
-        verify(profile, times(1)).query(UUID.class);
+        verify(profile, times(1)).query(AccountProvisionedListener.ProfileProvisionedRow.class);
         verify(outbox, times(1)).update();
     }
 }

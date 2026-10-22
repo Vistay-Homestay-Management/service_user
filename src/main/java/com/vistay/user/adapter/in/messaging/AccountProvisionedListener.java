@@ -39,23 +39,25 @@ public class AccountProvisionedListener {
         }
 
         var data = envelope.data();
-        var accountId = UUID.fromString(requiredText(data, "identityAccountId"));
-        var fullName = requiredText(data, "fullName");
+        var accountId = UUID.fromString(requiredText(data, "accountId"));
+        var fullName = requiredText(data, "displayName");
         var email = requiredText(data, "email");
-        var profileId = jdbc.sql("""
-            INSERT INTO admin_users(auth_account_id, full_name, email, user_type, profile_status)
-            VALUES (:accountId, :fullName, :email, 'ADMIN', 'ACTIVE')
+        var profile = jdbc.sql("""
+            INSERT INTO admin_users(
+                auth_account_id, full_name, email, user_type, profile_status, version
+            )
+            VALUES (:accountId, :fullName, :email, 'ADMIN', 'ACTIVE', 1)
             ON CONFLICT (auth_account_id) DO UPDATE
             SET full_name = EXCLUDED.full_name,
                 email = EXCLUDED.email,
                 updated_at = now(),
                 version = admin_users.version + 1
-            RETURNING id
+            RETURNING id, version
             """)
             .param("accountId", accountId)
             .param("fullName", fullName)
             .param("email", email)
-            .query(UUID.class)
+            .query(ProfileProvisionedRow.class)
             .single();
 
         jdbc.sql("""
@@ -63,26 +65,29 @@ public class AccountProvisionedListener {
             SELECT :profileId, id FROM roles WHERE code = 'SUPER_ADMIN'
             ON CONFLICT DO NOTHING
             """)
-            .param("profileId", profileId)
+            .param("profileId", profile.id())
             .update();
 
         var payload = json.writeValueAsString(new ProfileProvisionedData(
             accountId,
-            profileId,
+            profile.id(),
+            "BACKOFFICE",
             email,
             fullName,
-            "ADMIN"
+            profile.version(),
+            OffsetDateTime.now()
         ));
         jdbc.sql("""
             INSERT INTO outbox_events(
                 aggregate_type, aggregate_id, aggregate_version, event_type,
                 event_version, payload, correlation_id, causation_id
             ) VALUES (
-                'AdminProfile', :profileId, 0, :eventType,
+                'AdminProfile', :profileId, :aggregateVersion, :eventType,
                 1, CAST(:payload AS jsonb), :correlationId, :causationId
             )
             """)
-            .param("profileId", profileId)
+            .param("profileId", profile.id())
+            .param("aggregateVersion", profile.version())
             .param("eventType", PROFILE_PROVISIONED)
             .param("payload", payload)
             .param("correlationId", envelope.correlationId())
@@ -128,8 +133,12 @@ public class AccountProvisionedListener {
     private record ProfileProvisionedData(
         UUID accountId,
         UUID profileId,
+        String realm,
         String email,
         String displayName,
-        String accountType
+        long authorizationVersion,
+        OffsetDateTime provisionedAt
     ) {}
+
+    record ProfileProvisionedRow(UUID id, long version) {}
 }
