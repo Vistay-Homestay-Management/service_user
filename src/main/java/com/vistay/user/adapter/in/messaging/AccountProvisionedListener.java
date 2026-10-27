@@ -42,31 +42,37 @@ public class AccountProvisionedListener {
         var accountId = UUID.fromString(requiredText(data, "accountId"));
         var fullName = requiredText(data, "displayName");
         var email = requiredText(data, "email");
+        var subject = jdbc.sql("""
+            INSERT INTO authorization_subjects(account_type, auth_account_id, active)
+            VALUES ('ADMIN', :accountId, true)
+            ON CONFLICT (account_type, auth_account_id) DO UPDATE
+            SET active = true, updated_at = now()
+            RETURNING id, authorization_version
+            """)
+            .param("accountId", accountId)
+            .query(AuthorizationSubjectRow.class)
+            .single();
         var profile = jdbc.sql("""
             INSERT INTO admin_users(
-                auth_account_id, full_name, email, user_type, profile_status, version
+                auth_account_id, authorization_subject_id, full_name, email, user_type, profile_status, version
             )
-            VALUES (:accountId, :fullName, :email, 'ADMIN', 'ACTIVE', 1)
+            VALUES (:accountId, :subjectId, :fullName, :email, 'ADMIN', 'ACTIVE', 1)
             ON CONFLICT (auth_account_id) DO UPDATE
             SET full_name = EXCLUDED.full_name,
                 email = EXCLUDED.email,
+                authorization_subject_id = EXCLUDED.authorization_subject_id,
                 updated_at = now(),
                 version = admin_users.version + 1
             RETURNING id, version
             """)
             .param("accountId", accountId)
+            .param("subjectId", subject.id())
             .param("fullName", fullName)
             .param("email", email)
             .query(ProfileProvisionedRow.class)
             .single();
 
-        jdbc.sql("""
-            INSERT INTO admin_user_roles(admin_user_id, role_id)
-            SELECT :profileId, id FROM roles WHERE code = 'SUPER_ADMIN'
-            ON CONFLICT DO NOTHING
-            """)
-            .param("profileId", profile.id())
-            .update();
+        assignFirstSuperAdmin(subject.id(), profile.id());
 
         var payload = json.writeValueAsString(new ProfileProvisionedData(
             accountId,
@@ -74,7 +80,7 @@ public class AccountProvisionedListener {
             "BACKOFFICE",
             email,
             fullName,
-            profile.version(),
+            subject.authorizationVersion(),
             OffsetDateTime.now()
         ));
         jdbc.sql("""
@@ -93,6 +99,37 @@ public class AccountProvisionedListener {
             .param("correlationId", envelope.correlationId())
             .param("causationId", envelope.eventId().toString())
             .update();
+    }
+
+    private void assignFirstSuperAdmin(UUID subjectId, UUID profileId) {
+        var bootstrap = jdbc.sql("""
+            SELECT first_super_admin_subject_id FROM authorization_bootstrap_state
+            WHERE singleton FOR UPDATE
+            """).query(BootstrapRow.class).single();
+        if (bootstrap.firstSuperAdminSubjectId() != null) {
+            return;
+        }
+        jdbc.sql("""
+            INSERT INTO admin_user_roles(admin_user_id, role_id)
+            SELECT :profileId, id FROM roles WHERE code = 'SUPER_ADMIN'
+            ON CONFLICT DO NOTHING
+            """).param("profileId", profileId).update();
+        var assignmentId = jdbc.sql("""
+            INSERT INTO subject_role_assignments(subject_id, role_id)
+            SELECT :subjectId, id FROM roles WHERE code = 'SUPER_ADMIN'
+            RETURNING id
+            """).param("subjectId", subjectId).query(UUID.class).single();
+        jdbc.sql("""
+            INSERT INTO subject_role_permission_scopes(assignment_id, permission_id, scope_type)
+            SELECT :assignmentId, rp.permission_id, 'ALL'
+            FROM role_permissions rp JOIN roles r ON r.id = rp.role_id
+            WHERE r.code = 'SUPER_ADMIN'
+            ON CONFLICT DO NOTHING
+            """).param("assignmentId", assignmentId).update();
+        jdbc.sql("""
+            UPDATE authorization_bootstrap_state SET first_super_admin_subject_id = :subjectId
+            WHERE singleton
+            """).param("subjectId", subjectId).update();
     }
 
     private boolean markProcessed(UUID eventId) {
@@ -140,5 +177,7 @@ public class AccountProvisionedListener {
         OffsetDateTime provisionedAt
     ) {}
 
+    record AuthorizationSubjectRow(UUID id, long authorizationVersion) {}
+    record BootstrapRow(UUID firstSuperAdminSubjectId) {}
     record ProfileProvisionedRow(UUID id, long version) {}
 }

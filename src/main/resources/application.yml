@@ -52,6 +52,12 @@ spring:
       auto-offset-reset: earliest
       properties:
         isolation.level: read_committed
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: ${REDIS_TIMEOUT:1s}
   security:
     oauth2:
       resourceserver:
@@ -100,9 +106,12 @@ vistay:
     audience: ${KEYCLOAK_BACKOFFICE_AUDIENCE:vistay-backoffice-api}
   topics:
     account-provisioned: ${ACCOUNT_PROVISIONED_TOPIC:vistay.auth.account-provisioned.v1}
+    authorization-changed: ${AUTHORIZATION_CHANGED_TOPIC:user.authorization-changed.v1}
+  authorization:
+    cache-ttl: ${AUTHORIZATION_CACHE_TTL:60s}
   outbox:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT_SECONDS:10}
   grpc:
-    allowed-caller-uris: ${GRPC_ALLOWED_CALLER_URIS:spiffe://vistay/service/authentication}
+    allowed-caller-uris: ${GRPC_ALLOWED_CALLER_URIS:spiffe://vistay/service/authentication,spiffe://vistay/service/booking}
     maximum-deadline: ${GRPC_MAXIMUM_DEADLINE:2s}
