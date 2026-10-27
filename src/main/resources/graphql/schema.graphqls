@@ -1,5 +1,20 @@
 type Query {
   userServiceInfo: UserServiceInfo!
+  viewer: BackofficeViewer!
+  authorizationCatalog(accountType: AccountType!): [AuthorizationRole!]!
+  authorizationSubject(subjectId: ID!): AuthorizationSubject!
+  authorizationSubjectByAccount(accountType: AccountType!, accountId: ID!): AuthorizationSubject!
+  authorizationChangeRequests(status: AuthorizationChangeStatus = PENDING): [AuthorizationChangeRequest!]!
+  authorizationAudit(targetSubjectId: ID): [AuthorizationAuditEvent!]!
+}
+
+type Mutation {
+  requestAuthorizationChange(input: RequestAuthorizationChangeInput!): AuthorizationChangeRequest!
+  approveAuthorizationChange(id: ID!, reason: String!, expectedAuthorizationVersion: Int!): AuthorizationChangeRequest!
+  rejectAuthorizationChange(id: ID!, reason: String!): AuthorizationChangeRequest!
+  revokeRoleAssignment(assignmentId: ID!, reason: String!, expectedAuthorizationVersion: Int!): AuthorizationSubject!
+  reduceAuthorizationScopes(input: ReduceAuthorizationScopesInput!): AuthorizationSubject!
+  establishSecondApprover(targetSubjectId: ID!, reason: String!): AuthorizationSubject!
 }
 
 type UserServiceInfo {
@@ -7,3 +22,92 @@ type UserServiceInfo {
   version: String!
 }
 
+type BackofficeViewer {
+  accountId: ID!
+  profileId: ID!
+  displayName: String!
+  email: String!
+  roles: [String!]!
+  permissions: [String!]!
+  grants: [EffectiveGrant!]!
+  authorizationVersion: Int!
+}
+
+enum AccountType { CUSTOMER ADMIN HOST }
+enum DataScope { SELF OWN ASSIGNED ALL }
+enum AuthorizationChangeStatus { PENDING APPROVED REJECTED EXPIRED STALE }
+
+type EffectiveGrant { permissionCode: String!, scopes: [DataScope!]! }
+type AuthorizationPermissionPolicy {
+  permissionCode: String!
+  allowedScopes: [DataScope!]!
+  defaultScopes: [DataScope!]!
+}
+type AuthorizationRole {
+  code: String!
+  displayName: String!
+  accountType: AccountType!
+  policies: [AuthorizationPermissionPolicy!]!
+}
+type AuthorizationAssignment {
+  id: ID!
+  roleCode: String!
+  validUntil: String
+  grants: [EffectiveGrant!]!
+}
+type AuthorizationSubject {
+  id: ID!
+  accountType: AccountType!
+  accountId: ID!
+  profileId: ID!
+  active: Boolean!
+  authorizationVersion: Int!
+  assignments: [AuthorizationAssignment!]!
+  effectiveGrants: [EffectiveGrant!]!
+}
+type AuthorizationChangeRequest {
+  id: ID!
+  targetSubjectId: ID!
+  requestedBySubjectId: ID!
+  reviewedBySubjectId: ID
+  changeType: String!
+  status: AuthorizationChangeStatus!
+  roleCode: String!
+  reason: String!
+  reviewReason: String
+  expiresAt: String!
+  createdAt: String!
+}
+type AuthorizationAuditEvent {
+  id: ID!
+  actorSubjectId: ID
+  targetSubjectId: ID
+  action: String!
+  reason: String!
+  correlationId: String
+  createdAt: String!
+}
+
+input PermissionScopeOverrideInput {
+  permissionCode: String!
+  scopes: [DataScope!]!
+}
+input RequestAuthorizationChangeInput {
+  targetSubjectId: ID!
+  roleCode: String!
+  scopeOverrides: [PermissionScopeOverrideInput!] = []
+  validUntil: String
+  reason: String!
+  expectedAuthorizationVersion: Int!
+  idempotencyKey: String!
+}
+input RetainedPermissionScopesInput {
+  permissionCode: String!
+  scopes: [DataScope!]!
+}
+input ReduceAuthorizationScopesInput {
+  assignmentId: ID!
+  retainedScopes: [RetainedPermissionScopesInput!]!
+  reason: String!
+  expectedAuthorizationVersion: Int!
+}
