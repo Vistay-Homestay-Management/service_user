@@ -1,6 +1,7 @@
 type Query {
   userServiceInfo: UserServiceInfo!
   viewer: BackofficeViewer!
+  myProfile: PersonalProfile!
   authorizationCatalog(accountType: AccountType!): [AuthorizationRole!]!
   authorizationSubject(subjectId: ID!): AuthorizationSubject!
   authorizationSubjectByAccount(accountType: AccountType!, accountId: ID!): AuthorizationSubject!
@@ -9,6 +10,7 @@ type Query {
 }
 
 type Mutation {
+  updateMyProfile(input: UpdateMyProfileInput!): PersonalProfile!
   requestAuthorizationChange(input: RequestAuthorizationChangeInput!): AuthorizationChangeRequest!
   approveAuthorizationChange(id: ID!, reason: String!, expectedAuthorizationVersion: Int!): AuthorizationChangeRequest!
   rejectAuthorizationChange(id: ID!, reason: String!): AuthorizationChangeRequest!
@@ -27,10 +29,34 @@ type BackofficeViewer {
   profileId: ID!
   displayName: String!
   email: String!
+  contactPhone: String
+  avatarMediaId: ID
+  profileVersion: Int!
   roles: [String!]!
   permissions: [String!]!
   grants: [EffectiveGrant!]!
   authorizationVersion: Int!
+}
+
+type PersonalProfile {
+  accountId: ID!
+  profileId: ID!
+  displayName: String!
+  email: String!
+  contactPhone: String
+  avatarMediaId: ID
+  version: Int!
+  updatedAt: String!
+  replayed: Boolean!
+}
+
+input UpdateMyProfileInput {
+  displayName: String!
+  contactPhone: String
+  avatarMediaId: ID
+  expectedVersion: Int!
+  reason: String!
+  idempotencyKey: String!
 }
 
 enum AccountType { CUSTOMER ADMIN HOST }

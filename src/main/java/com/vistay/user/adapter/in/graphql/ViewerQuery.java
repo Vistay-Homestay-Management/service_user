@@ -30,7 +30,7 @@ public class ViewerQuery {
             throw error("PROFILE_NOT_PROVISIONED", "Backoffice profile is not active or provisioned");
         }
         var profile = jdbc.sql("""
-                SELECT full_name, email::text AS email
+                SELECT full_name, email::text AS email, normalized_phone, avatar_media_id, version
                 FROM admin_users WHERE id = :profileId
                 """)
             .param("profileId", snapshot.profileId())
@@ -41,7 +41,8 @@ public class ViewerQuery {
                 grant.scopes().stream().map(Enum::name).toList()))
             .toList();
         return new BackofficeViewer(accountId, snapshot.profileId(), profile.fullName(), profile.email(),
-            snapshot.roles(), snapshot.permissions(), grants, snapshot.authorizationVersion());
+            profile.normalizedPhone(), profile.avatarMediaId(), profile.version(), snapshot.roles(),
+            snapshot.permissions(), grants, snapshot.authorizationVersion());
     }
 
     static UUID accountId(Jwt jwt) {
@@ -63,9 +64,10 @@ public class ViewerQuery {
             .build();
     }
 
-    private record ProfileRow(String fullName, String email) {}
+    private record ProfileRow(String fullName, String email, String normalizedPhone,
+        UUID avatarMediaId, long version) {}
     public record EffectiveGrant(String permissionCode, List<String> scopes) {}
     public record BackofficeViewer(UUID accountId, UUID profileId, String displayName, String email,
-        List<String> roles, List<String> permissions, List<EffectiveGrant> grants,
-        long authorizationVersion) {}
+        String contactPhone, UUID avatarMediaId, long profileVersion, List<String> roles,
+        List<String> permissions, List<EffectiveGrant> grants, long authorizationVersion) {}
 }

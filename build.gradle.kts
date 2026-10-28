@@ -46,6 +46,7 @@ dependencies {
 	testImplementation("com.tngtech.archunit:archunit-junit5:1.4.1")
 	testImplementation("org.springframework.boot:spring-boot-testcontainers")
 	testImplementation(platform("org.testcontainers:testcontainers-bom:2.0.5"))
+	testImplementation("org.testcontainers:testcontainers-junit-jupiter")
 	testImplementation("org.testcontainers:testcontainers-postgresql")
 	testImplementation("org.testcontainers:testcontainers-kafka")
 	testRuntimeOnly("org.junit.platform:junit-platform-launcher")
