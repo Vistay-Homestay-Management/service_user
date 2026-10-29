@@ -3,6 +3,7 @@ package com.vistay.user.adapter.in.grpc;
 import com.vistay.contracts.common.v1.AccountType;
 import com.vistay.contracts.common.v1.DataScopeType;
 import com.vistay.contracts.common.v1.PermissionGrant;
+import com.vistay.contracts.common.v1.PartitionGrant;
 import com.vistay.contracts.user.v1.GetAuthorizationSnapshotRequest;
 import com.vistay.contracts.user.v1.GetAuthorizationSnapshotResponse;
 import com.vistay.contracts.user.v1.UserAuthorizationServiceGrpc;
@@ -51,6 +52,10 @@ public class UserAuthorizationGrpcService extends UserAuthorizationServiceGrpc.U
                 .setPermissionCode(grant.permissionCode())
                 .addAllScopes(grant.scopes().stream().map(scope -> DataScopeType.valueOf(
                     "DATA_SCOPE_TYPE_" + scope.name())).toList())
+                .addAllPartitions(grant.partitions().stream().map(partition -> PartitionGrant.newBuilder()
+                    .setPartitionType(partition.partitionType())
+                    .setPartitionId(partition.partitionId().toString())
+                    .build()).toList())
                 .build()));
             response.onNext(builder.build());
             response.onCompleted();

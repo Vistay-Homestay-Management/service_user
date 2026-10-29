@@ -60,7 +60,7 @@ input UpdateMyProfileInput {
 }
 
 enum AccountType { CUSTOMER ADMIN HOST }
-enum DataScope { SELF OWN ASSIGNED ALL }
+enum DataScope { SELF OWN ASSIGNED PARTITION ALL }
 enum AuthorizationChangeStatus { PENDING APPROVED REJECTED EXPIRED STALE }
 
 type EffectiveGrant { permissionCode: String!, scopes: [DataScope!]! }

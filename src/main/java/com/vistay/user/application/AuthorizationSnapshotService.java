@@ -129,13 +129,39 @@ public class AuthorizationSnapshotService {
             .query(GrantRow.class)
             .list();
 
+        var partitionRows = jdbc.sql("""
+                SELECT p.code AS permission_code, srpp.partition_type, srpp.partition_id
+                FROM subject_role_assignments sra
+                JOIN roles r ON r.id = sra.role_id AND r.active
+                JOIN subject_role_permission_partitions srpp ON srpp.assignment_id = sra.id
+                JOIN permissions p ON p.id = srpp.permission_id AND p.active
+                WHERE sra.subject_id = :subjectId
+                  AND sra.revoked_at IS NULL
+                  AND sra.valid_from <= now()
+                  AND (sra.valid_until IS NULL OR sra.valid_until > now())
+                  AND r.audience = :accountType
+                ORDER BY p.code, srpp.partition_type, srpp.partition_id
+                """)
+            .param("subjectId", header.subjectId())
+            .param("accountType", accountType)
+            .query(PartitionRow.class)
+            .list();
+
         Map<String, EnumSet<Scope>> grouped = new LinkedHashMap<>();
         for (var row : rows) {
             grouped.computeIfAbsent(row.permissionCode(), ignored -> EnumSet.noneOf(Scope.class))
                 .add(Scope.valueOf(row.scopeType()));
         }
+        Map<String, List<PartitionBinding>> partitions = new LinkedHashMap<>();
+        for (var row : partitionRows) {
+            partitions.computeIfAbsent(row.permissionCode(), ignored -> new ArrayList<>())
+                .add(new PartitionBinding(row.partitionType(), row.partitionId()));
+            grouped.computeIfAbsent(row.permissionCode(), ignored -> EnumSet.noneOf(Scope.class))
+                .add(Scope.PARTITION);
+        }
         var grants = new ArrayList<Grant>();
-        grouped.forEach((permission, scopes) -> grants.add(new Grant(permission, List.copyOf(scopes))));
+        grouped.forEach((permission, scopes) -> grants.add(new Grant(permission, List.copyOf(scopes),
+            List.copyOf(partitions.getOrDefault(permission, List.of())))));
         return new Snapshot(accountType, authAccountId, header.subjectId(), header.profileId(), true,
             header.authorizationVersion(), roles, List.copyOf(grants));
     }
@@ -172,10 +198,17 @@ public class AuthorizationSnapshotService {
 
     private record Header(UUID subjectId, UUID profileId, boolean active, long authorizationVersion) {}
     private record GrantRow(String permissionCode, String scopeType) {}
+    private record PartitionRow(String permissionCode, String partitionType, UUID partitionId) {}
 
-    public enum Scope { SELF, OWN, ASSIGNED, ALL }
+    public enum Scope { SELF, OWN, ASSIGNED, PARTITION, ALL }
 
-    public record Grant(String permissionCode, List<Scope> scopes) {}
+    public record PartitionBinding(String partitionType, UUID partitionId) {}
+
+    public record Grant(String permissionCode, List<Scope> scopes, List<PartitionBinding> partitions) {
+        public Grant(String permissionCode, List<Scope> scopes) {
+            this(permissionCode, scopes, List.of());
+        }
+    }
 
     public record Snapshot(
         String accountType,
