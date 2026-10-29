@@ -1,12 +1,14 @@
 package com.vistay.user.application;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
 import java.util.UUID;
 import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import org.testcontainers.containers.PostgreSQLContainer;
@@ -29,6 +31,8 @@ class PricingOverridePermissionMigrationIntegrationTest {
     private static final UUID CTV_SUBJECT = UUID.fromString("10000000-0000-4000-8000-000000000005");
     private static final UUID STAFF_SUBJECT = UUID.fromString("10000000-0000-4000-8000-000000000006");
     private static final UUID HOST_SUBJECT = UUID.fromString("10000000-0000-4000-8000-000000000007");
+    private static final UUID LIFECYCLE_MANAGER_SUBJECT =
+        UUID.fromString("10000000-0000-4000-8000-000000000008");
 
     private static final UUID SUPER_ASSIGNMENT = UUID.fromString("20000000-0000-4000-8000-000000000001");
     private static final UUID MANAGER_ASSIGNMENT = UUID.fromString("20000000-0000-4000-8000-000000000002");
@@ -37,7 +41,13 @@ class PricingOverridePermissionMigrationIntegrationTest {
     private static final UUID CTV_ASSIGNMENT = UUID.fromString("20000000-0000-4000-8000-000000000005");
     private static final UUID STAFF_ASSIGNMENT = UUID.fromString("20000000-0000-4000-8000-000000000006");
     private static final UUID HOST_ASSIGNMENT = UUID.fromString("20000000-0000-4000-8000-000000000007");
+    private static final UUID LIFECYCLE_MANAGER_ASSIGNMENT =
+        UUID.fromString("20000000-0000-4000-8000-000000000008");
     private static final UUID MANAGER_BRANCH = UUID.fromString("30000000-0000-4000-8000-000000000001");
+    private static final UUID LIFECYCLE_MANAGER_BRANCH =
+        UUID.fromString("30000000-0000-4000-8000-000000000002");
+    private static final UUID UPDATED_LIFECYCLE_MANAGER_BRANCH =
+        UUID.fromString("30000000-0000-4000-8000-000000000003");
 
     private static JdbcClient jdbc;
 
@@ -102,7 +112,6 @@ class PricingOverridePermissionMigrationIntegrationTest {
             .list();
 
         assertThat(policies).containsExactly(
-            new ScopePolicyRow("MANAGER", "pricing:override", "ALL", false),
             new ScopePolicyRow("MANAGER", "pricing:override", "ASSIGNED", true),
             new ScopePolicyRow("SUPER_ADMIN", "pricing:approve-large-override", "ALL", true),
             new ScopePolicyRow("SUPER_ADMIN", "pricing:override", "ALL", true));
@@ -120,6 +129,16 @@ class PricingOverridePermissionMigrationIntegrationTest {
 
         assertThat(partitionPolicies).containsExactly(
             new PartitionPolicyRow("MANAGER", "pricing:override", "BRANCH"));
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                INSERT INTO role_permission_policies(
+                    role_id, permission_id, scope_type, default_scope)
+                SELECT r.id, p.id, 'ALL', false
+                FROM roles r
+                JOIN permissions p ON p.code = 'pricing:override'
+                WHERE r.code = 'MANAGER'
+                """).update())
+            .isInstanceOf(DataAccessException.class);
     }
 
     @Test
@@ -154,6 +173,99 @@ class PricingOverridePermissionMigrationIntegrationTest {
         assertThat(authorizationVersion(CTV_SUBJECT)).isEqualTo(10);
         assertThat(authorizationVersion(STAFF_SUBJECT)).isEqualTo(10);
         assertThat(authorizationVersion(HOST_SUBJECT)).isEqualTo(10);
+    }
+
+    @Test
+    void synchronizesNewManagerGrantBranchChangesAndRevocationWithoutAllScope() {
+        insertAdmin(
+            LIFECYCLE_MANAGER_SUBJECT,
+            "MANAGER",
+            LIFECYCLE_MANAGER_BRANCH,
+            "Future Branch Manager"
+        );
+        var versionBeforeBranchChange = authorizationVersion(LIFECYCLE_MANAGER_SUBJECT);
+
+        insertAssignment(
+            LIFECYCLE_MANAGER_ASSIGNMENT,
+            LIFECYCLE_MANAGER_SUBJECT,
+            "MANAGER"
+        );
+
+        assertThat(scopesFor(LIFECYCLE_MANAGER_ASSIGNMENT))
+            .containsExactly("pricing:override:ASSIGNED");
+        assertThat(partitionsFor(LIFECYCLE_MANAGER_ASSIGNMENT)).containsExactly(
+            new PartitionBindingRow(
+                "pricing:override",
+                "BRANCH",
+                LIFECYCLE_MANAGER_BRANCH
+            )
+        );
+
+        assertThatThrownBy(() -> jdbc.sql("""
+                INSERT INTO subject_role_permission_scopes(
+                    assignment_id, permission_id, scope_type)
+                SELECT :assignmentId, p.id, 'ALL'
+                FROM permissions p
+                WHERE p.code = 'pricing:override'
+                """)
+            .param("assignmentId", LIFECYCLE_MANAGER_ASSIGNMENT)
+            .update())
+            .isInstanceOf(DataAccessException.class);
+
+        jdbc.sql("""
+                DELETE FROM subject_role_permission_scopes srps
+                USING permissions p
+                WHERE srps.assignment_id = :assignmentId
+                  AND srps.permission_id = p.id
+                  AND p.code = 'pricing:override'
+                """)
+            .param("assignmentId", LIFECYCLE_MANAGER_ASSIGNMENT)
+            .update();
+        assertThat(scopesFor(LIFECYCLE_MANAGER_ASSIGNMENT)).isEmpty();
+        assertThat(partitionsFor(LIFECYCLE_MANAGER_ASSIGNMENT)).isEmpty();
+
+        jdbc.sql("""
+                UPDATE admin_users
+                SET branch_reference_id = :branchId
+                WHERE authorization_subject_id = :subjectId
+                """)
+            .param("branchId", UPDATED_LIFECYCLE_MANAGER_BRANCH)
+            .param("subjectId", LIFECYCLE_MANAGER_SUBJECT)
+            .update();
+
+        assertThat(partitionsFor(LIFECYCLE_MANAGER_ASSIGNMENT)).isEmpty();
+
+        jdbc.sql("""
+                INSERT INTO subject_role_permission_scopes(
+                    assignment_id, permission_id, scope_type)
+                SELECT :assignmentId, p.id, 'ASSIGNED'
+                FROM permissions p
+                WHERE p.code = 'pricing:override'
+                """)
+            .param("assignmentId", LIFECYCLE_MANAGER_ASSIGNMENT)
+            .update();
+
+        assertThat(partitionsFor(LIFECYCLE_MANAGER_ASSIGNMENT)).containsExactly(
+            new PartitionBindingRow(
+                "pricing:override",
+                "BRANCH",
+                UPDATED_LIFECYCLE_MANAGER_BRANCH
+            )
+        );
+        assertThat(authorizationVersion(LIFECYCLE_MANAGER_SUBJECT))
+            .isEqualTo(versionBeforeBranchChange + 1);
+
+        jdbc.sql("""
+                UPDATE subject_role_assignments
+                SET revoked_at = now(), revoke_reason = 'Integration lifecycle test'
+                WHERE id = :assignmentId
+                """)
+            .param("assignmentId", LIFECYCLE_MANAGER_ASSIGNMENT)
+            .update();
+
+        assertThat(partitionsFor(LIFECYCLE_MANAGER_ASSIGNMENT)).isEmpty();
+        assertThat(scopesFor(LIFECYCLE_MANAGER_ASSIGNMENT))
+            .containsExactly("pricing:override:ASSIGNED");
     }
 
     private static org.flywaydb.core.api.configuration.FluentConfiguration flyway(
