@@ -120,5 +120,5 @@ vistay:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT_SECONDS:10}
   grpc:
-    allowed-caller-uris: ${GRPC_ALLOWED_CALLER_URIS:spiffe://vistay/service/authentication,spiffe://vistay/service/booking,spiffe://vistay/service/finance}
+    allowed-caller-uris: ${GRPC_ALLOWED_CALLER_URIS:spiffe://vistay/service/authentication,spiffe://vistay/service/booking,spiffe://vistay/service/finance,spiffe://vistay/service/payment}
     maximum-deadline: ${GRPC_MAXIMUM_DEADLINE:2s}
