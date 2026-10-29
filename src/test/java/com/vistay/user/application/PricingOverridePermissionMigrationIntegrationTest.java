@@ -165,7 +165,10 @@ class PricingOverridePermissionMigrationIntegrationTest {
 
     @Test
     void incrementsOnlySubjectsWhoseEffectiveAssignmentsGainPermissions() {
-        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(11);
+        // V8 adds the override permissions. V10 repairs SUPER_ADMIN's complete
+        // catalog but deliberately does not grant missing legacy MANAGER
+        // pricing permissions because their absence may be a prior reduction.
+        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(12);
         assertThat(authorizationVersion(MANAGER_SUBJECT)).isEqualTo(11);
         assertThat(authorizationVersion(MANAGER_WITHOUT_BRANCH_SUBJECT)).isEqualTo(11);
 
