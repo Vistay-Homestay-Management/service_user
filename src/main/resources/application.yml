@@ -113,6 +113,8 @@ vistay:
     audience: ${KEYCLOAK_BACKOFFICE_AUDIENCE:vistay-backoffice-api}
   topics:
     account-provisioned: ${ACCOUNT_PROVISIONED_TOPIC:vistay.auth.account-provisioned.v1}
+    host-identity-activated: ${HOST_IDENTITY_ACTIVATED_TOPIC:vistay.host.identity-activated.v1}
+    host-lifecycle-changed: ${HOST_LIFECYCLE_CHANGED_TOPIC:vistay.host.lifecycle-changed.v1}
     authorization-changed: ${AUTHORIZATION_CHANGED_TOPIC:user.authorization-changed.v1}
   authorization:
     cache-ttl: ${AUTHORIZATION_CACHE_TTL:60s}
