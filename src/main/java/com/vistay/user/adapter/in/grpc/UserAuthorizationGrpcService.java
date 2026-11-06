@@ -6,8 +6,13 @@ import com.vistay.contracts.common.v1.PermissionGrant;
 import com.vistay.contracts.common.v1.PartitionGrant;
 import com.vistay.contracts.user.v1.GetAuthorizationSnapshotRequest;
 import com.vistay.contracts.user.v1.GetAuthorizationSnapshotResponse;
+import com.vistay.contracts.user.v1.GetRolePoliciesRequest;
+import com.vistay.contracts.user.v1.GetRolePoliciesResponse;
+import com.vistay.contracts.user.v1.RolePermissionPolicy;
+import com.vistay.contracts.user.v1.RolePolicy;
 import com.vistay.contracts.user.v1.UserAuthorizationServiceGrpc;
 import com.vistay.user.application.AuthorizationSnapshotService;
+import com.vistay.user.application.RolePolicyService;
 import com.vistay.user.config.GrpcTrustBoundaryInterceptor;
 import io.grpc.Status;
 import io.grpc.stub.StreamObserver;
@@ -17,9 +22,46 @@ import org.springframework.grpc.server.service.GrpcService;
 @GrpcService(interceptors = GrpcTrustBoundaryInterceptor.class)
 public class UserAuthorizationGrpcService extends UserAuthorizationServiceGrpc.UserAuthorizationServiceImplBase {
     private final AuthorizationSnapshotService snapshots;
+    private final RolePolicyService rolePolicies;
 
-    public UserAuthorizationGrpcService(AuthorizationSnapshotService snapshots) {
+    public UserAuthorizationGrpcService(
+        AuthorizationSnapshotService snapshots,
+        RolePolicyService rolePolicies
+    ) {
         this.snapshots = snapshots;
+        this.rolePolicies = rolePolicies;
+    }
+
+    @Override
+    public void getRolePolicies(
+        GetRolePoliciesRequest request,
+        StreamObserver<GetRolePoliciesResponse> response
+    ) {
+        try {
+            var accountType = accountType(request.getAccountType());
+            var result = rolePolicies.get(accountType, request.getRoleCodesList());
+            var builder = GetRolePoliciesResponse.newBuilder()
+                .setCatalogVersion(result.catalogVersion())
+                .setSchemaVersion(result.schemaVersion());
+            result.policies().forEach(policy -> builder.addPolicies(RolePolicy.newBuilder()
+                .setRoleCode(policy.roleCode())
+                .setRoleVersion(policy.roleVersion())
+                .addAllPermissions(policy.permissions().stream().map(permission ->
+                    RolePermissionPolicy.newBuilder()
+                        .setPermissionCode(permission.permissionCode())
+                        .addAllAllowedScopes(permission.allowedScopes().stream()
+                            .map(scope -> DataScopeType.valueOf("DATA_SCOPE_TYPE_" + scope)).toList())
+                        .addAllPartitionTypes(permission.partitionTypes())
+                        .build()).toList())
+                .build()));
+            response.onNext(builder.build());
+            response.onCompleted();
+        } catch (IllegalArgumentException invalid) {
+            response.onError(Status.INVALID_ARGUMENT.withDescription(invalid.getMessage()).asRuntimeException());
+        } catch (RuntimeException failure) {
+            response.onError(Status.UNAVAILABLE.withDescription("Role policies are unavailable")
+                .withCause(failure).asRuntimeException());
+        }
     }
 
     @Override

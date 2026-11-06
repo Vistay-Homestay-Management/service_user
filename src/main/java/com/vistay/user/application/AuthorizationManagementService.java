@@ -40,12 +40,17 @@ public class AuthorizationManagementService {
     }
 
     public Actor requireActor(UUID accountId, String permission) {
-        var snapshot = snapshots.get("ADMIN", accountId);
+        return requireActor("ADMIN", accountId, permission, Scope.ALL);
+    }
+
+    public Actor requireActor(String accountType, UUID accountId, String permission, Scope scope) {
+        var normalizedType = normalizeAccountType(accountType);
+        var snapshot = snapshots.get(normalizedType, accountId);
         if (!snapshot.active() || snapshot.subjectId() == null) {
-            throw error("UNAUTHENTICATED", "The administrator profile is not active");
+            throw error("UNAUTHENTICATED", "The authorization subject is not active");
         }
-        if (!snapshot.allows(permission, Scope.ALL)) {
-            throw error("FORBIDDEN_PERMISSION", "Missing permission " + permission + "@ALL");
+        if (!snapshot.allows(permission, scope)) {
+            throw error("FORBIDDEN_PERMISSION", "Missing permission " + permission + "@" + scope);
         }
         return new Actor(snapshot.subjectId(), snapshot.profileId(), snapshot.authorizationVersion());
     }

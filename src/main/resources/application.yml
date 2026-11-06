@@ -118,6 +118,9 @@ vistay:
     authorization-changed: ${AUTHORIZATION_CHANGED_TOPIC:user.authorization-changed.v1}
   authorization:
     cache-ttl: ${AUTHORIZATION_CACHE_TTL:60s}
+    role-policy-cache-ttl: ${ROLE_POLICY_CACHE_TTL:5m}
+    role-policy-cache-jitter: ${ROLE_POLICY_CACHE_JITTER:30s}
+    expiry-reconcile-delay-ms: ${AUTHORIZATION_EXPIRY_RECONCILE_DELAY_MS:30000}
   outbox:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT_SECONDS:10}
