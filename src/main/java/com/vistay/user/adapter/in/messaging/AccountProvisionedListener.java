@@ -1,8 +1,10 @@
 package com.vistay.user.adapter.in.messaging;
 
+import com.vistay.user.application.HostProvisioningService;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.kafka.annotation.KafkaListener;
 import org.springframework.stereotype.Component;
@@ -18,21 +20,52 @@ public class AccountProvisionedListener {
 
     private final JdbcClient jdbc;
     private final ObjectMapper json;
+    private final HostProvisioningService hostProvisioning;
 
-    public AccountProvisionedListener(JdbcClient jdbc, ObjectMapper json) {
+    @Autowired
+    public AccountProvisionedListener(
+        JdbcClient jdbc,
+        ObjectMapper json,
+        HostProvisioningService hostProvisioning
+    ) {
         this.jdbc = jdbc;
         this.json = json;
+        this.hostProvisioning = hostProvisioning;
+    }
+
+    /** Kept for the existing ADMIN unit test and lightweight adapter callers. */
+    public AccountProvisionedListener(JdbcClient jdbc, ObjectMapper json) {
+        this(jdbc, json, null);
     }
 
     @KafkaListener(
-        topics = "${vistay.topics.account-provisioned:vistay.auth.account-provisioned.v1}",
+        topics = {
+            "${vistay.topics.account-provisioned:vistay.auth.account-provisioned.v1}",
+            "${vistay.topics.host-identity-activated:vistay.host.identity-activated.v1}",
+            "${vistay.topics.host-lifecycle-changed:vistay.host.lifecycle-changed.v1}"
+        },
         groupId = "${spring.kafka.consumer.group-id:vistay-user}"
     )
     @Transactional
     public void onAccountProvisioned(String rawEnvelope) throws Exception {
         var envelope = json.readValue(rawEnvelope, EventEnvelope.class);
+        if (isHostEvent(envelope)) {
+            if (hostProvisioning == null) {
+                throw new IllegalStateException("HOST provisioning service is unavailable");
+            }
+            hostProvisioning.consume(new HostProvisioningService.EventEnvelope(
+                envelope.eventId(), envelope.type(), envelope.version(), envelope.aggregateId(),
+                envelope.aggregateVersion(), envelope.correlationId(), envelope.causationId(),
+                envelope.occurredAt(), envelope.data()
+            ));
+            return;
+        }
         if (!EVENT_TYPE.equals(envelope.type()) || envelope.version() != 1) {
             throw new IllegalArgumentException("Unsupported account provisioning event");
+        }
+        var accountType = optionalText(envelope.data(), "accountType");
+        if (accountType != null && !"ADMIN".equals(accountType)) {
+            throw new IllegalArgumentException("Unsupported account type for ADMIN provisioning");
         }
         if (!markProcessed(envelope.eventId())) {
             return;
@@ -99,6 +132,33 @@ public class AccountProvisionedListener {
             .param("correlationId", envelope.correlationId())
             .param("causationId", envelope.eventId().toString())
             .update();
+    }
+
+    private static boolean isHostEvent(EventEnvelope envelope) {
+        if (envelope == null || envelope.type() == null) {
+            return false;
+        }
+        if (HostProvisioningService.HOST_IDENTITY_ACTIVATED.equals(envelope.type())
+            || HostProvisioningService.HOST_LIFECYCLE_CHANGED.equals(envelope.type())) {
+            return true;
+        }
+        if (!EVENT_TYPE.equals(envelope.type()) || envelope.data() == null) {
+            return false;
+        }
+        var accountType = optionalText(envelope.data(), "accountType");
+        var realm = optionalText(envelope.data(), "realm");
+        return "HOST".equals(accountType) || "HOST".equals(realm) || "vistay-host".equals(realm);
+    }
+
+    private static String optionalText(JsonNode data, String field) {
+        if (data == null) {
+            return null;
+        }
+        var node = data.get(field);
+        if (node == null || node.isNull() || node.asString() == null || node.asString().isBlank()) {
+            return null;
+        }
+        return node.asString();
     }
 
     private void assignFirstSuperAdmin(UUID subjectId, UUID profileId) {
