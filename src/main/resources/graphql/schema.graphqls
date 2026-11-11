@@ -2,6 +2,7 @@ type Query {
   userServiceInfo: UserServiceInfo!
   viewer: BackofficeViewer!
   myProfile: PersonalProfile!
+  userDirectory(accountType: AccountType!, search: String, first: Int = 25, after: String): UserDirectoryPage!
   authorizationCatalog(accountType: AccountType!): [AuthorizationRole!]!
   authorizationSubject(subjectId: ID!): AuthorizationSubject!
   authorizationSubjectByAccount(accountType: AccountType!, accountId: ID!): AuthorizationSubject!
@@ -14,6 +15,8 @@ type Query {
   myLoyaltyProfile: LoyaltyProfile!
   loyaltyPrograms: [LoyaltyProgram!]!
   loyaltyProgramChangeRequests(status: String): [LoyaltyProgramChangeRequest!]!
+  myProfileLinkStatus: ProfileAccountLink!
+  profileLinkRequests(profileType: AccountType, status: String = "APPROVAL_PENDING", first: Int = 50): [ProfileLinkReview!]!
 }
 
 type Mutation {
@@ -33,6 +36,73 @@ type Mutation {
   approveLoyaltyProgramChange(id: ID!, reason: String!): LoyaltyProgramChangeRequest!
   rejectLoyaltyProgramChange(id: ID!, reason: String!): LoyaltyProgramChangeRequest!
   adjustQualifyingPoints(input: QualifyingPointAdjustmentInput!): LoyaltyProfile!
+  protectProfileIdentityDocument(input: ProtectProfileIdentityDocumentInput!): ProtectedIdentityDocument!
+  requestMyProfileLink(input: RequestProfileLinkInput!): ProfileAccountLink!
+  verifyMyProfileLink(input: VerifyProfileLinkInput!): ProfileAccountLink!
+  approveProfileLink(input: ApproveProfileLinkInput!): ProfileAccountLink!
+  rejectProfileLink(input: RejectProfileLinkInput!): ProfileAccountLink!
+}
+
+type ProtectedIdentityDocument {
+  id: ID!
+  profileType: AccountType!
+  profileId: ID!
+  lookupKeyVersion: Int!
+  encryptionKeyVersion: Int!
+  assuranceLevel: String!
+  rowVersion: String!
+  createdAt: String!
+}
+
+type ProfileAccountLink {
+  linkId: ID
+  challengeId: ID
+  profileType: AccountType!
+  status: String!
+  maskedRecipient: String
+  expiresAt: String
+  requiresApproval: Boolean!
+  replayed: Boolean!
+}
+
+type ProfileLinkReview {
+  linkId: ID!
+  profileType: AccountType!
+  profileId: ID!
+  authAccountId: ID!
+  status: String!
+  linkMethod: String!
+  requestedAt: String!
+  maskedRecipient: String
+  displayName: String
+}
+
+input ProtectProfileIdentityDocumentInput {
+  profileType: AccountType!
+  profileId: ID!
+  cccd: String!
+  expectedProfileVersion: String!
+  reason: String!
+}
+
+input RequestProfileLinkInput {
+  displayName: String!
+  cccd: String!
+}
+
+input VerifyProfileLinkInput {
+  challengeId: ID!
+  code: String!
+}
+
+input ApproveProfileLinkInput {
+  linkId: ID!
+  reason: String!
+}
+
+input RejectProfileLinkInput {
+  linkId: ID!
+  reason: String!
 }
 
 type LoyaltyTier {
@@ -155,6 +225,28 @@ type PersonalProfile {
   version: Int!
   updatedAt: String!
   replayed: Boolean!
+}
+
+type UserDirectoryPage {
+  nodes: [UserDirectoryEntry!]!
+  totalCount: Int!
+  nextCursor: String
+}
+
+type UserDirectoryEntry {
+  profileId: ID!
+  accountId: ID
+  accountType: AccountType!
+  displayName: String!
+  email: String
+  contactPhone: String
+  status: String!
+  referenceCode: String
+  subtype: String
+  verificationStatus: String
+  joinedOn: String
+  createdAt: String!
+  updatedAt: String!
 }
 
 input UpdateMyProfileInput {

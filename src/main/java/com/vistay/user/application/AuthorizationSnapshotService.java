@@ -6,6 +6,7 @@ import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,7 +47,7 @@ public class AuthorizationSnapshotService {
         var key = cacheKey(normalizedType, authAccountId, header.authorizationVersion());
         var cached = readCache(key);
         if (cached != null
-            && cached.profileId().equals(header.profileId())
+            && Objects.equals(cached.profileId(), header.profileId())
             && cached.active() == header.active()) {
             return cached;
         }
@@ -76,10 +77,10 @@ public class AuthorizationSnapshotService {
         };
         return jdbc.sql("""
                 SELECT s.id AS subject_id, p.id AS profile_id,
-                       (s.active AND p.profile_status = 'ACTIVE') AS active,
+                       (s.active AND COALESCE(p.profile_status = 'ACTIVE', true)) AS active,
                        s.authorization_version
                 FROM authorization_subjects s
-                JOIN %s p ON p.authorization_subject_id = s.id
+                LEFT JOIN %s p ON p.authorization_subject_id = s.id
                 WHERE s.account_type = :accountType AND s.auth_account_id = :accountId
                 """.formatted(table))
             .param("accountType", accountType)
