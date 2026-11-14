@@ -111,16 +111,33 @@ logging:
 vistay:
   security:
     audience: ${KEYCLOAK_BACKOFFICE_AUDIENCE:vistay-backoffice-api}
+    customer-issuer: ${KEYCLOAK_CUSTOMER_ISSUER:http://identity.localhost/realms/vistay-customer}
+    customer-jwks: ${KEYCLOAK_CUSTOMER_JWKS_URI:http://localhost:8180/realms/vistay-customer/protocol/openid-connect/certs}
+    customer-audience: ${KEYCLOAK_CUSTOMER_AUDIENCE:vistay-customer-api}
+    host-issuer: ${KEYCLOAK_HOST_ISSUER:http://identity.localhost/realms/vistay-host}
+    host-jwks: ${KEYCLOAK_HOST_JWKS_URI:http://localhost:8180/realms/vistay-host/protocol/openid-connect/certs}
+    host-audience: ${KEYCLOAK_HOST_AUDIENCE:vistay-host-api}
   topics:
     account-provisioned: ${ACCOUNT_PROVISIONED_TOPIC:vistay.auth.account-provisioned.v1}
     host-identity-activated: ${HOST_IDENTITY_ACTIVATED_TOPIC:vistay.host.identity-activated.v1}
     host-lifecycle-changed: ${HOST_LIFECYCLE_CHANGED_TOPIC:vistay.host.lifecycle-changed.v1}
     authorization-changed: ${AUTHORIZATION_CHANGED_TOPIC:user.authorization-changed.v1}
+    profile-link-challenge-delivered: ${PROFILE_LINK_CHALLENGE_DELIVERED_TOPIC:vistay.user.profile-link-challenge-delivered.v1}
   authorization:
     cache-ttl: ${AUTHORIZATION_CACHE_TTL:60s}
     role-policy-cache-ttl: ${ROLE_POLICY_CACHE_TTL:5m}
     role-policy-cache-jitter: ${ROLE_POLICY_CACHE_JITTER:30s}
     expiry-reconcile-delay-ms: ${AUTHORIZATION_EXPIRY_RECONCILE_DELAY_MS:30000}
+  identity-protection:
+    vault:
+      address: ${VAULT_ADDR:http://localhost:8200}
+      token: ${VAULT_TOKEN:}
+      token-file: ${VAULT_TOKEN_FILE:}
+      transit-mount: ${VAULT_TRANSIT_MOUNT:transit}
+      document-key: ${VAULT_PROFILE_DOCUMENT_KEY:vistay-profile-document}
+      lookup-key: ${VAULT_PROFILE_LOOKUP_KEY:vistay-profile-lookup}
+      otp-key: ${VAULT_PROFILE_LINK_OTP_KEY:vistay-profile-link-otp}
+      otp-delivery-key: ${VAULT_PROFILE_LINK_DELIVERY_KEY:vistay-profile-link-delivery}
   outbox:
     poll-delay-ms: ${OUTBOX_POLL_DELAY_MS:1000}
     send-timeout-seconds: ${OUTBOX_SEND_TIMEOUT_SECONDS:10}
