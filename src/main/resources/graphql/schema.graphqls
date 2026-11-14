@@ -3,6 +3,8 @@ type Query {
   viewer: BackofficeViewer!
   myProfile: PersonalProfile!
   userDirectory(accountType: AccountType!, search: String, first: Int = 25, after: String): UserDirectoryPage!
+  userProfile(accountType: AccountType!, profileId: ID!): UserProfileDetails!
+  identityPolicies: [IdentityPolicy!]!
   authorizationCatalog(accountType: AccountType!): [AuthorizationRole!]!
   authorizationSubject(subjectId: ID!): AuthorizationSubject!
   authorizationSubjectByAccount(accountType: AccountType!, accountId: ID!): AuthorizationSubject!
@@ -41,6 +43,84 @@ type Mutation {
   verifyMyProfileLink(input: VerifyProfileLinkInput!): ProfileAccountLink!
   approveProfileLink(input: ApproveProfileLinkInput!): ProfileAccountLink!
   rejectProfileLink(input: RejectProfileLinkInput!): ProfileAccountLink!
+  createCustomerProfile(input: CreateCustomerProfileInput!): UserProfileDetails!
+  createAdminProfile(input: CreateAdminProfileInput!): UserProfileDetails!
+  createHostProfile(input: CreateHostProfileInput!): UserProfileDetails!
+  updateIdentityPolicy(input: UpdateIdentityPolicyInput!): IdentityPolicy!
+}
+
+type UserProfileDetails {
+  profileId: ID!
+  accountId: ID
+  accountType: AccountType!
+  displayName: String!
+  email: String
+  contactPhone: String
+  status: String!
+  referenceCode: String
+  subtype: String
+  verificationStatus: String
+  relevantDate: String
+  address: String
+  taxCode: String
+  version: Int!
+  createdAt: String!
+  updatedAt: String!
+}
+
+type IdentityPolicy {
+  accountType: AccountType!
+  policyVersion: Int!
+  registrationEnabled: Boolean!
+  linkMode: String!
+  linkDeadlineSeconds: Int!
+  otpTtlSeconds: Int!
+  maxOtpAttempts: Int!
+  disableGracePeriodSeconds: Int!
+  purgeAfterSeconds: Int!
+  active: Boolean!
+  updatedAt: String!
+}
+
+input CreateCustomerProfileInput {
+  fullName: String!
+  email: String
+  contactPhone: String
+  dateOfBirth: String
+  address: String
+  reason: String!
+  idempotencyKey: String!
+}
+
+input CreateAdminProfileInput {
+  fullName: String!
+  email: String
+  contactPhone: String
+  employeeCode: String
+  subtype: String! = "STAFF"
+  hiredOn: String
+  reason: String!
+  idempotencyKey: String!
+}
+
+input CreateHostProfileInput {
+  fullName: String!
+  email: String
+  contactPhone: String
+  hostCode: String
+  address: String
+  taxCode: String
+  reason: String!
+  idempotencyKey: String!
+}
+
+input UpdateIdentityPolicyInput {
+  accountType: AccountType!
+  registrationEnabled: Boolean!
+  linkMode: String!
+  expectedPolicyVersion: Int!
+  reason: String!
+  idempotencyKey: String!
 }
 
 type ProtectedIdentityDocument {
