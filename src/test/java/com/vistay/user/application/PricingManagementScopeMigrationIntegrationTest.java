@@ -136,7 +136,7 @@ class PricingManagementScopeMigrationIntegrationTest {
             new PartitionBindingRow("pricing:read", "BRANCH", REDUCED_MANAGER_BRANCH));
         assertThat(partitionsFor(RECEPTIONIST_ASSIGNMENT)).isEmpty();
 
-        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(11);
+        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(12);
         assertThat(authorizationVersion(MANAGER_SUBJECT)).isEqualTo(11);
         assertThat(authorizationVersion(MANAGER_WITHOUT_BRANCH_SUBJECT)).isEqualTo(11);
         assertThat(authorizationVersion(REDUCED_MANAGER_SUBJECT)).isEqualTo(11);
