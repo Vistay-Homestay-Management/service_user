@@ -131,7 +131,7 @@ class InventoryBlockScopeMigrationIntegrationTest {
         assertThat(inventoryBlockPartitionsFor(REDUCED_MANAGER_ASSIGNMENT)).isEmpty();
         assertThat(inventoryBlockPartitionsFor(SUPER_ASSIGNMENT)).isEmpty();
 
-        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(21);
+        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(22);
         assertThat(authorizationVersion(MANAGER_SUBJECT)).isEqualTo(21);
         assertThat(authorizationVersion(NULL_BRANCH_SUBJECT)).isEqualTo(21);
         assertThat(authorizationVersion(REDUCED_MANAGER_SUBJECT)).isEqualTo(20);
