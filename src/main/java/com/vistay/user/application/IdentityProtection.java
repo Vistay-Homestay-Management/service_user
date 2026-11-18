@@ -5,9 +5,25 @@ package com.vistay.user.application;
  * Implementations must never log plaintext inputs or return a reusable key.
  */
 public interface IdentityProtection {
-    ProtectedDocument protectCccd(String normalizedCccd);
+    ProtectedDocument protectIdentityDocument(
+        String documentCountry,
+        String documentType,
+        String normalizedValue
+    );
 
-    ProtectedValue hmacCccd(String normalizedCccd);
+    ProtectedValue hmacIdentityDocument(
+        String documentCountry,
+        String documentType,
+        String normalizedValue
+    );
+
+    default ProtectedDocument protectCccd(String normalizedCccd) {
+        return protectIdentityDocument("VN", "CCCD", normalizedCccd);
+    }
+
+    default ProtectedValue hmacCccd(String normalizedCccd) {
+        return hmacIdentityDocument("VN", "CCCD", normalizedCccd);
+    }
 
     ProtectedValue hmacOtpEvidence(String canonicalEvidence);
 

@@ -3,7 +3,9 @@ package com.vistay.user.adapter.in.graphql;
 import com.vistay.user.application.ProfileAdministrationService;
 import com.vistay.user.application.ProfileAdministrationService.AdminDraft;
 import com.vistay.user.application.ProfileAdministrationService.CustomerDraft;
+import com.vistay.user.application.ProfileAdministrationService.CustomerContactAvailability;
 import com.vistay.user.application.ProfileAdministrationService.HostDraft;
+import com.vistay.user.application.ProfileAdministrationService.IdentityDocumentAvailability;
 import com.vistay.user.application.ProfileAdministrationService.ProfileView;
 import java.util.UUID;
 import org.springframework.graphql.data.method.annotation.Argument;
@@ -27,6 +29,27 @@ public class ProfileAdministrationController {
         return profiles.find(accountType, profileId);
     }
 
+    @QueryMapping
+    @RequiresPermission("customer-profile:create")
+    public IdentityDocumentAvailability customerIdentityDocumentAvailability(
+        @Argument String nationalityCode,
+        @Argument String documentType,
+        @Argument String documentNumber
+    ) {
+        return profiles.customerIdentityDocumentAvailability(
+            nationalityCode, documentType, documentNumber
+        );
+    }
+
+    @QueryMapping
+    @RequiresPermission("customer-profile:create")
+    public CustomerContactAvailability customerContactAvailability(
+        @Argument String email,
+        @Argument String contactPhone
+    ) {
+        return profiles.customerContactAvailability(email, contactPhone);
+    }
+
     @MutationMapping
     @RequiresPermission("customer-profile:create")
     public ProfileView createCustomerProfile(
@@ -35,6 +58,7 @@ public class ProfileAdministrationController {
     ) {
         return profiles.createCustomer(ViewerQuery.accountId(jwt), new CustomerDraft(
             input.fullName(), input.email(), input.contactPhone(), input.dateOfBirth(),
+            input.nationalityCode(), input.documentType(), input.documentNumber(),
             input.address(), input.reason(), input.idempotencyKey()
         ));
     }
@@ -65,6 +89,7 @@ public class ProfileAdministrationController {
 
     public record CreateCustomerProfileInput(
         String fullName, String email, String contactPhone, String dateOfBirth,
+        String nationalityCode, String documentType, String documentNumber,
         String address, String reason, String idempotencyKey
     ) {}
 

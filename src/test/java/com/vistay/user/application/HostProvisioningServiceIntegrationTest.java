@@ -54,7 +54,7 @@ class HostProvisioningServiceIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.sql("""
-            TRUNCATE TABLE outbox_events, processed_events,
+            TRUNCATE TABLE profile_contact_claims, outbox_events, processed_events,
                            authorization_audit_events,
                            subject_role_permission_scopes,
                            subject_role_assignments,

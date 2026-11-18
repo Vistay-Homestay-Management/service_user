@@ -6,6 +6,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Base64;
+import java.util.Locale;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
@@ -47,8 +48,12 @@ public class VaultTransitIdentityProtection implements IdentityProtection {
     }
 
     @Override
-    public ProtectedDocument protectCccd(String normalizedCccd) {
-        var input = cccdInput(normalizedCccd);
+    public ProtectedDocument protectIdentityDocument(
+        String documentCountry,
+        String documentType,
+        String normalizedValue
+    ) {
+        var input = identityDocumentInput(documentCountry, documentType, normalizedValue);
         var lookup = hmac(lookupKey, input);
         var encrypted = encrypt(documentKey, input);
         return new ProtectedDocument(
@@ -57,8 +62,12 @@ public class VaultTransitIdentityProtection implements IdentityProtection {
     }
 
     @Override
-    public ProtectedValue hmacCccd(String normalizedCccd) {
-        return hmac(lookupKey, cccdInput(normalizedCccd));
+    public ProtectedValue hmacIdentityDocument(
+        String documentCountry,
+        String documentType,
+        String normalizedValue
+    ) {
+        return hmac(lookupKey, identityDocumentInput(documentCountry, documentType, normalizedValue));
     }
 
     @Override
@@ -144,11 +153,29 @@ public class VaultTransitIdentityProtection implements IdentityProtection {
         }
     }
 
-    private static String cccdInput(String normalizedCccd) {
-        if (normalizedCccd == null || !normalizedCccd.matches("^[0-9]{12}$")) {
-            throw new IllegalArgumentException("CCCD must contain exactly 12 digits");
+    private static String identityDocumentInput(
+        String documentCountry,
+        String documentType,
+        String normalizedValue
+    ) {
+        var country = requirePattern(documentCountry, "^[A-Z]{2}$", "document country");
+        var type = requirePattern(documentType, "^(CCCD|PASSPORT)$", "document type");
+        var value = requireValue(normalizedValue, "identity document value");
+        if ("CCCD".equals(type) && (!"VN".equals(country) || !value.matches("^[0-9]{12}$"))) {
+            throw new IllegalArgumentException("CCCD must be issued by VN and contain exactly 12 digits");
         }
-        return "VN:CCCD:v1:" + normalizedCccd;
+        if ("PASSPORT".equals(type) && !value.matches("^[A-Z0-9]{6,20}$")) {
+            throw new IllegalArgumentException("Passport must contain 6 to 20 letters or digits");
+        }
+        // This preserves the existing VN:CCCD:v1 canonical form and therefore
+        // keeps every previously generated deterministic lookup HMAC usable.
+        return country + ":" + type + ":v1:" + value;
+    }
+
+    private static String requirePattern(String value, String pattern, String label) {
+        var normalized = requireValue(value, label).trim().toUpperCase(Locale.ROOT);
+        if (!normalized.matches(pattern)) throw new IllegalArgumentException("Invalid " + label);
+        return normalized;
     }
 
     private static String requireValue(String value, String label) {

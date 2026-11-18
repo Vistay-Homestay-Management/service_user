@@ -65,7 +65,9 @@ class ProfileServiceIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbc.sql("""
-            TRUNCATE TABLE profile_update_requests, audit_events,
+            TRUNCATE TABLE profile_identity_documents, profile_contact_claims,
+                           profile_creation_requests, profile_update_requests,
+                           outbox_events, audit_events, customers,
                            admin_users, authorization_subjects CASCADE
             """).update();
         reset(snapshots);
@@ -95,6 +97,81 @@ class ProfileServiceIntegrationTest {
         service = new ProfileService(
             jdbc, snapshots, transactions, JsonMapper.builder().build()
         );
+    }
+
+    @Test
+    void identityDocumentAvailabilityUsesServerSideHmacWithoutExposingPlaintext() {
+        var protection = mock(IdentityProtection.class);
+        var lookup = "vault:v1:dGVzdC1sb29rdXA=";
+        when(protection.hmacIdentityDocument("VN", "CCCD", "001234567890"))
+            .thenReturn(new IdentityProtection.ProtectedValue(lookup, 1));
+        jdbc.sql("""
+            INSERT INTO profile_identity_documents(
+                profile_type, profile_id, document_country, document_type,
+                lookup_hmac, lookup_key_version, encrypted_value,
+                encryption_key_version, assurance_level
+            ) VALUES (
+                'CUSTOMER', :profileId, 'VN', 'CCCD',
+                :lookup, 1, 'vault:v1:encrypted-test-value',
+                1, 'SELF_DECLARED'
+            )
+            """)
+            .param("profileId", UUID.randomUUID())
+            .param("lookup", lookup)
+            .update();
+        var administration = new ProfileAdministrationService(
+            jdbc, transactions, JsonMapper.builder().build(), protection
+        );
+
+        var result = administration.customerIdentityDocumentAvailability(
+            "vn", "cccd", "001234567890"
+        );
+
+        assertThat(result.available()).isFalse();
+    }
+
+    @Test
+    void customerContactAvailabilityNormalizesEmailAndPhoneWithinCustomerProfiles() {
+        jdbc.sql("""
+            INSERT INTO customers(full_name, email, normalized_phone)
+            VALUES ('Existing Guest', 'guest@example.test', '+84901234567')
+            """).update();
+        var administration = new ProfileAdministrationService(
+            jdbc, transactions, JsonMapper.builder().build(), mock(IdentityProtection.class)
+        );
+
+        var result = administration.customerContactAvailability(
+            " GUEST@EXAMPLE.TEST ", "+84 901-234-567"
+        );
+
+        assertThat(result.emailAvailable()).isFalse();
+        assertThat(result.phoneAvailable()).isFalse();
+    }
+
+    @Test
+    void createsCustomerWithoutUserSuppliedReasonAndKeepsAnAuditFallback() {
+        var protection = mock(IdentityProtection.class);
+        when(protection.protectIdentityDocument("VN", "CCCD", "001234567890"))
+            .thenReturn(new IdentityProtection.ProtectedDocument(
+                "vault:v1:dGVzdC1jcmVhdGU=", 1, "vault:v1:encrypted-test-value", 1
+            ));
+        var administration = new ProfileAdministrationService(
+            jdbc, transactions, JsonMapper.builder().build(), protection
+        );
+
+        var created = administration.createCustomer(accountId,
+            new ProfileAdministrationService.CustomerDraft(
+                "Optional Reason Guest", "optional-reason@example.test", null,
+                null, "VN", "CCCD", "001234567890", null,
+                null, UUID.randomUUID().toString()
+            )
+        );
+
+        assertThat(created.profileId()).isNotNull();
+        assertThat(jdbc.sql("""
+            SELECT reason FROM profile_creation_requests WHERE profile_id = :profileId
+            """).param("profileId", created.profileId()).query(String.class).single())
+            .isEqualTo("Tạo hồ sơ từ trang quản trị");
     }
 
     @Test

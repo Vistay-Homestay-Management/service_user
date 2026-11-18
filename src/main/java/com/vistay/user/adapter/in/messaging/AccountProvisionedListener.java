@@ -75,6 +75,9 @@ public class AccountProvisionedListener {
         var accountId = UUID.fromString(requiredText(data, "accountId"));
         var fullName = requiredText(data, "displayName");
         var email = requiredText(data, "email");
+        var provisioningMode = optionalText(data, "provisioningMode");
+        var bootstrapAccount = provisioningMode == null || "BOOTSTRAP".equals(provisioningMode);
+        var userType = bootstrapAccount ? "ADMIN" : "STAFF";
         var subject = jdbc.sql("""
             INSERT INTO authorization_subjects(account_type, auth_account_id, active)
             VALUES ('ADMIN', :accountId, true)
@@ -89,7 +92,7 @@ public class AccountProvisionedListener {
             INSERT INTO admin_users(
                 auth_account_id, authorization_subject_id, full_name, email, user_type, profile_status, version
             )
-            VALUES (:accountId, :subjectId, :fullName, :email, 'ADMIN', 'ACTIVE', 1)
+            VALUES (:accountId, :subjectId, :fullName, :email, :userType, 'ACTIVE', 1)
             ON CONFLICT (auth_account_id) DO UPDATE
             SET full_name = EXCLUDED.full_name,
                 email = EXCLUDED.email,
@@ -102,10 +105,13 @@ public class AccountProvisionedListener {
             .param("subjectId", subject.id())
             .param("fullName", fullName)
             .param("email", email)
+            .param("userType", userType)
             .query(ProfileProvisionedRow.class)
             .single();
 
-        assignFirstSuperAdmin(subject.id(), profile.id());
+        if (bootstrapAccount) {
+            assignFirstSuperAdmin(subject.id(), profile.id());
+        }
 
         var payload = json.writeValueAsString(new ProfileProvisionedData(
             accountId,

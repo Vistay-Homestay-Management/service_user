@@ -4,6 +4,12 @@ type Query {
   myProfile: PersonalProfile!
   userDirectory(accountType: AccountType!, search: String, first: Int = 25, after: String): UserDirectoryPage!
   userProfile(accountType: AccountType!, profileId: ID!): UserProfileDetails!
+  customerIdentityDocumentAvailability(
+    nationalityCode: String!
+    documentType: String!
+    documentNumber: String!
+  ): IdentityDocumentAvailability!
+  customerContactAvailability(email: String, contactPhone: String): CustomerContactAvailability!
   identityPolicies: [IdentityPolicy!]!
   authorizationCatalog(accountType: AccountType!): [AuthorizationRole!]!
   authorizationSubject(subjectId: ID!): AuthorizationSubject!
@@ -63,9 +69,20 @@ type UserProfileDetails {
   relevantDate: String
   address: String
   taxCode: String
+  nationalityCode: String
+  documentType: String
   version: Int!
   createdAt: String!
   updatedAt: String!
+}
+
+type IdentityDocumentAvailability {
+  available: Boolean!
+}
+
+type CustomerContactAvailability {
+  emailAvailable: Boolean
+  phoneAvailable: Boolean
 }
 
 type IdentityPolicy {
@@ -87,8 +104,11 @@ input CreateCustomerProfileInput {
   email: String
   contactPhone: String
   dateOfBirth: String
+  nationalityCode: String! = "VN"
+  documentType: String!
+  documentNumber: String!
   address: String
-  reason: String!
+  reason: String
   idempotencyKey: String!
 }
 
@@ -99,7 +119,7 @@ input CreateAdminProfileInput {
   employeeCode: String
   subtype: String! = "STAFF"
   hiredOn: String
-  reason: String!
+  reason: String
   idempotencyKey: String!
 }
 
@@ -110,7 +130,7 @@ input CreateHostProfileInput {
   hostCode: String
   address: String
   taxCode: String
-  reason: String!
+  reason: String
   idempotencyKey: String!
 }
 
