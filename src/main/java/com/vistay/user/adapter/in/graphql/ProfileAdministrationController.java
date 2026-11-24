@@ -7,6 +7,7 @@ import com.vistay.user.application.ProfileAdministrationService.CustomerContactA
 import com.vistay.user.application.ProfileAdministrationService.HostDraft;
 import com.vistay.user.application.ProfileAdministrationService.IdentityDocumentAvailability;
 import com.vistay.user.application.ProfileAdministrationService.ProfileView;
+import com.vistay.user.observability.UserBusinessMetrics;
 import java.util.UUID;
 import org.springframework.graphql.data.method.annotation.Argument;
 import org.springframework.graphql.data.method.annotation.MutationMapping;
@@ -18,9 +19,11 @@ import org.springframework.stereotype.Controller;
 @Controller
 public class ProfileAdministrationController {
     private final ProfileAdministrationService profiles;
+    private final UserBusinessMetrics metrics;
 
-    public ProfileAdministrationController(ProfileAdministrationService profiles) {
+    public ProfileAdministrationController(ProfileAdministrationService profiles, UserBusinessMetrics metrics) {
         this.profiles = profiles;
+        this.metrics = metrics;
     }
 
     @QueryMapping
@@ -56,11 +59,13 @@ public class ProfileAdministrationController {
         @AuthenticationPrincipal Jwt jwt,
         @Argument CreateCustomerProfileInput input
     ) {
-        return profiles.createCustomer(ViewerQuery.accountId(jwt), new CustomerDraft(
+        var profile = profiles.createCustomer(ViewerQuery.accountId(jwt), new CustomerDraft(
             input.fullName(), input.email(), input.contactPhone(), input.dateOfBirth(),
             input.nationalityCode(), input.documentType(), input.documentNumber(),
             input.address(), input.reason(), input.idempotencyKey()
         ));
+        metrics.profileCreated("CUSTOMER");
+        return profile;
     }
 
     @MutationMapping
@@ -69,10 +74,12 @@ public class ProfileAdministrationController {
         @AuthenticationPrincipal Jwt jwt,
         @Argument CreateAdminProfileInput input
     ) {
-        return profiles.createAdmin(ViewerQuery.accountId(jwt), new AdminDraft(
+        var profile = profiles.createAdmin(ViewerQuery.accountId(jwt), new AdminDraft(
             input.fullName(), input.email(), input.contactPhone(), input.employeeCode(),
             input.subtype(), input.hiredOn(), input.reason(), input.idempotencyKey()
         ));
+        metrics.profileCreated("ADMIN");
+        return profile;
     }
 
     @MutationMapping
@@ -81,10 +88,12 @@ public class ProfileAdministrationController {
         @AuthenticationPrincipal Jwt jwt,
         @Argument CreateHostProfileInput input
     ) {
-        return profiles.createHost(ViewerQuery.accountId(jwt), new HostDraft(
+        var profile = profiles.createHost(ViewerQuery.accountId(jwt), new HostDraft(
             input.fullName(), input.email(), input.contactPhone(), input.hostCode(),
             input.address(), input.taxCode(), input.reason(), input.idempotencyKey()
         ));
+        metrics.profileCreated("HOST");
+        return profile;
     }
 
     public record CreateCustomerProfileInput(

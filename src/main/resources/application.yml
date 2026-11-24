@@ -90,6 +90,9 @@ server:
   shutdown: graceful
 
 management:
+  metrics:
+    tags:
+      application: ${spring.application.name}
   tracing:
     sampling:
       probability: ${MANAGEMENT_TRACING_SAMPLING_PROBABILITY:1.0}
@@ -109,6 +112,8 @@ logging:
       console: logstash
 
 vistay:
+  observability:
+    business-metrics-refresh: ${BUSINESS_METRICS_REFRESH:60s}
   security:
     audience: ${KEYCLOAK_BACKOFFICE_AUDIENCE:vistay-backoffice-api}
     customer-issuer: ${KEYCLOAK_CUSTOMER_ISSUER:http://identity.localhost/realms/vistay-customer}
