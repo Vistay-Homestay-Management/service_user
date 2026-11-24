@@ -131,7 +131,7 @@ class InventoryReadScopeMigrationIntegrationTest {
         assertThat(inventoryPartitionsFor(SUPER_ASSIGNMENT)).isEmpty();
         assertThat(inventoryPartitionsFor(CTV_ASSIGNMENT)).isEmpty();
 
-        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(21);
+        assertThat(authorizationVersion(SUPER_SUBJECT)).isEqualTo(22);
         assertThat(authorizationVersion(CTV_SUBJECT)).isEqualTo(20);
         assertThat(authorizationVersion(MANAGER_SUBJECT)).isEqualTo(21);
         assertThat(authorizationVersion(RECEPTIONIST_SUBJECT)).isEqualTo(21);
